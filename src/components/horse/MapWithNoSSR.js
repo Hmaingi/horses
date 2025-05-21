@@ -1,27 +1,31 @@
+// components/HorseMetrics/MapWithNoSSR.jsx
 import dynamic from "next/dynamic";
-import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
-// Fix for default marker icons in Leaflet with Next.js
-const DefaultIcon = L.icon({
-  iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
-  shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41],
-});
-L.Marker.prototype.options.icon = DefaultIcon;
-
+// Dynamically import react-leaflet components with SSR disabled
 const MapContainer = dynamic(() => import("react-leaflet").then((mod) => mod.MapContainer), { ssr: false });
 const TileLayer = dynamic(() => import("react-leaflet").then((mod) => mod.TileLayer), { ssr: false });
 const Marker = dynamic(() => import("react-leaflet").then((mod) => mod.Marker), { ssr: false });
 const Popup = dynamic(() => import("react-leaflet").then((mod) => mod.Popup), { ssr: false });
 
 const MapWithNoSSR = ({ horses, selectedHorse }) => {
+  // Set up Leaflet icons only on the client side
+  if (typeof window !== "undefined") {
+    const L = require("leaflet");
+    const DefaultIcon = L.icon({
+      iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
+      shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
+      iconSize: [25, 41],
+      iconAnchor: [12, 41],
+      popupAnchor: [1, -34],
+      shadowSize: [41, 41],
+    });
+    L.Marker.prototype.options.icon = DefaultIcon;
+  }
+
   const position = selectedHorse
     ? [selectedHorse.coordinates.lat, selectedHorse.coordinates.lng]
-    : [40.7178, -74.001];
+    : [40.7178, -74.001]; // Default to New York if no horse selected
   const zoom = selectedHorse ? 15 : 12;
 
   return (
@@ -39,9 +43,9 @@ const MapWithNoSSR = ({ horses, selectedHorse }) => {
           <Popup>
             <strong>{selectedHorse.name}</strong>
             <br />
-            Location: {selectedHorse.location}
+            Location: {selectedHorse.location || "Unknown"}
             <br />
-            Last updated: {selectedHorse.lastUpdated}
+            Last updated: {selectedHorse.lastUpdated || "Unknown"}
           </Popup>
         </Marker>
       ) : (
@@ -51,11 +55,11 @@ const MapWithNoSSR = ({ horses, selectedHorse }) => {
             position={[horse.coordinates.lat, horse.coordinates.lng]}
           >
             <Popup>
-              <strong>{horse.name}</strong>
+              <strong>{horse.name || "Unnamed"}</strong>
               <br />
-              Location: {horse.location}
+              Location: {horse.location || "Unknown"}
               <br />
-              Last updated: {horse.lastUpdated}
+              Last updated: {horse.lastUpdated || "Unknown"}
             </Popup>
           </Marker>
         ))

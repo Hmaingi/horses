@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  output: "export", // Use standalone output for better performance
   eslint: {
     // Disable specific ESLint rules during builds
     ignoreDuringBuilds: true, // Set to true to ignore all ESLint errors
