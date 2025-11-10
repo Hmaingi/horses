@@ -1,10 +1,30 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import Badge from "../ui/badge/Badge";
 import { HeartIcon, LocationIcon, SpeedIcon, TemperatureIcon } from "@/icons";
 import MapWithNoSSR from "./MapWithNoSSR";
 
 const DetailedHorseView = ({ horse, onClose }) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [insights, setInsights] = useState(horse.behavioralInsights || "");
+
+  //Load locally saved insights for persistence
+  useEffect(() => {
+    if (horse?.horseId) {
+      const saved = localStorage.getItem(`insights_${horse.horseId}`);
+      if (saved) {
+        setInsights(saved);
+        horse.behavioralInsights = saved;
+      }
+    }
+  }, [horse?.horseId]);
+
   if (!horse) return null;
+
+  const handleSave = () => {
+    horse.behavioralInsights = insights;
+    localStorage.setItem(`insights_${horse.horseId}`, insights); //Save locally
+    setIsEditing(false);
+  };
 
   return (
     <div className="bg-white dark:bg-gray-900 z-150 overflow-y-auto p-6">
@@ -16,7 +36,13 @@ const DetailedHorseView = ({ horse, onClose }) => {
           </div>
           <div className="flex items-center gap-4">
             <Badge
-              color={horse.status === "normal" ? "success" : horse.status === "attention" ? "warning" : "error"}
+              color={
+                horse.status === "normal"
+                  ? "success"
+                  : horse.status === "attention"
+                  ? "warning"
+                  : "error"
+              }
             >
               {horse.status}
             </Badge>
@@ -88,10 +114,46 @@ const DetailedHorseView = ({ horse, onClose }) => {
             </div>
           </div>
           <div className="space-y-6">
+            {/* 🧠 Editable Behavioral Insights */}
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-4">
               <h3 className="text-xl font-semibold mb-3 text-gray-800 dark:text-white">Behavioral Insights</h3>
-              <p className="text-gray-700 dark:text-gray-300">{horse.behavioralInsights || "Not enough data"}</p>
+              {isEditing ? (
+                <div className="space-y-2">
+                  <textarea
+                    value={insights}
+                    onChange={(e) => setInsights(e.target.value)}
+                    className="w-full h-32 p-2 border rounded-lg dark:bg-gray-700 dark:text-white"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleSave}
+                      className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                    >
+                      Save
+                    </button>
+                    <button
+                      onClick={() => setIsEditing(false)}
+                      className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white rounded hover:bg-gray-300 dark:hover:bg-gray-600"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <p className="text-gray-700 dark:text-gray-300">
+                    {insights || "No insights yet."}
+                  </p>
+                  <button
+                    onClick={() => setIsEditing(true)}
+                    className="mt-3 px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-white rounded hover:bg-gray-200 dark:hover:bg-gray-600"
+                  >
+                    Edit
+                  </button>
+                </div>
+              )}
             </div>
+
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-4">
               <h3 className="text-xl font-semibold mb-3 text-gray-800 dark:text-white">Activity Log</h3>
               <div className="space-y-3">
@@ -118,6 +180,7 @@ const DetailedHorseView = ({ horse, onClose }) => {
                 </div>
               </div>
             </div>
+
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-4">
               <h3 className="text-xl font-semibold mb-3 text-gray-800 dark:text-white">Care History</h3>
               <div className="space-y-1 text-sm">
