@@ -4,25 +4,22 @@ import { HeartIcon, LocationIcon, SpeedIcon, TemperatureIcon } from "@/icons";
 import MapWithNoSSR from "./MapWithNoSSR";
 
 const DetailedHorseView = ({ horse, onClose }) => {
+  if (!horse) return null;
+
   const [isEditing, setIsEditing] = useState(false);
   const [insights, setInsights] = useState(horse.behavioralInsights || "");
 
-  //Load locally saved insights for persistence
+  // Load locally saved insights for persistence
   useEffect(() => {
     if (horse?.horseId) {
       const saved = localStorage.getItem(`insights_${horse.horseId}`);
-      if (saved) {
-        setInsights(saved);
-        horse.behavioralInsights = saved;
-      }
+      if (saved) setInsights(saved);
     }
   }, [horse?.horseId]);
 
-  if (!horse) return null;
-
   const handleSave = () => {
     horse.behavioralInsights = insights;
-    localStorage.setItem(`insights_${horse.horseId}`, insights); //Save locally
+    localStorage.setItem(`insights_${horse.horseId}`, insights);
     setIsEditing(false);
   };
 
@@ -54,6 +51,7 @@ const DetailedHorseView = ({ horse, onClose }) => {
             </button>
           </div>
         </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-4">
@@ -65,6 +63,7 @@ const DetailedHorseView = ({ horse, onClose }) => {
                 Current location: <span className="font-medium">{horse.location || "Unknown"}</span>
               </div>
             </div>
+
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-4">
               <h3 className="text-xl font-semibold mb-4 text-gray-800 dark:text-white">Vital Statistics</h3>
               <div className="grid grid-cols-2 gap-4">
@@ -78,6 +77,7 @@ const DetailedHorseView = ({ horse, onClose }) => {
                   </div>
                   <div className="mt-1 text-sm text-gray-500">Normal range: 36-48 BPM</div>
                 </div>
+
                 <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
                   <div className="flex items-center gap-2">
                     <TemperatureIcon className="size-5 text-red-400" />
@@ -88,6 +88,7 @@ const DetailedHorseView = ({ horse, onClose }) => {
                   </div>
                   <div className="mt-1 text-sm text-gray-500">Normal range: 37.2-38.3°C</div>
                 </div>
+
                 <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
                   <div className="flex items-center gap-2">
                     <SpeedIcon className="size-5 text-blue-500" />
@@ -100,6 +101,7 @@ const DetailedHorseView = ({ horse, onClose }) => {
                     Current activity: {horse.speed > 0 ? "Moving" : "Stationary"}
                   </div>
                 </div>
+
                 <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
                   <div className="flex items-center gap-2">
                     <div className="text-green-500">O²</div>
@@ -113,8 +115,9 @@ const DetailedHorseView = ({ horse, onClose }) => {
               </div>
             </div>
           </div>
+
           <div className="space-y-6">
-            {/* 🧠 Editable Behavioral Insights */}
+            {/* Editable Behavioral Insights */}
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-4">
               <h3 className="text-xl font-semibold mb-3 text-gray-800 dark:text-white">Behavioral Insights</h3>
               {isEditing ? (
@@ -141,9 +144,7 @@ const DetailedHorseView = ({ horse, onClose }) => {
                 </div>
               ) : (
                 <div>
-                  <p className="text-gray-700 dark:text-gray-300">
-                    {insights || "No insights yet."}
-                  </p>
+                  <p className="text-gray-700 dark:text-gray-300">{insights || "Not enough data"}</p>
                   <button
                     onClick={() => setIsEditing(true)}
                     className="mt-3 px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-white rounded hover:bg-gray-200 dark:hover:bg-gray-600"
@@ -154,6 +155,7 @@ const DetailedHorseView = ({ horse, onClose }) => {
               )}
             </div>
 
+            {/* Activity Log */}
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-4">
               <h3 className="text-xl font-semibold mb-3 text-gray-800 dark:text-white">Activity Log</h3>
               <div className="space-y-3">
@@ -181,6 +183,7 @@ const DetailedHorseView = ({ horse, onClose }) => {
               </div>
             </div>
 
+            {/* Care History */}
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-4">
               <h3 className="text-xl font-semibold mb-3 text-gray-800 dark:text-white">Care History</h3>
               <div className="space-y-1 text-sm">
@@ -206,3 +209,4 @@ const DetailedHorseView = ({ horse, onClose }) => {
 };
 
 export default DetailedHorseView;
+
