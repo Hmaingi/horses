@@ -17,88 +17,82 @@ export const HorseMetrics = () => {
   // Railway backend URL
   const API_BASE_URL = "https://ebackend-production-fac4.up.railway.app/api";
 
-  // Get browser location and send to backend
+  // ---- FIX 1: Browser Geolocation ----
   useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const loc = {
-            lat: position.coords.latitude,
-            lng: position.coords.longitude,
-          };
-          setUserLocation(loc);
-
-          // Send location to backend so horses are centered around it
-          fetch(`${API_BASE_URL}/location`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(loc),
-          }).catch((err) =>
-            console.error("Failed to send location to backend:", err)
-          );
-        },
-        (error) => {
-          console.error("Geolocation error:", error);
-          setUserLocation({ lat: -0.4235, lng: 36.9485 }); // fallback
-        }
-      );
-    } else {
-      console.error("Geolocation not supported");
-      setUserLocation({ lat: -0.4235, lng: 36.9485 });
+    if (!navigator.geolocation) {
+      setUserLocation({ lat: -1.286389, lng: 36.817223 }); // Nairobi fallback
+      return;
     }
+
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        setUserLocation({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude
+        });
+      },
+      err => {
+        console.error("Geo error:", err);
+        setUserLocation({ lat: -1.286389, lng: 36.817223 });
+      },
+      { enableHighAccuracy: true }
+    );
   }, []);
 
-  // Combined data fetch function
+  // ---- Helper: ensure numbers are real numbers ----
+  const safeNum = v => (typeof v === "string" ? parseFloat(v) : v);
+
+  // ---- Fetch horses + fix values ----
   const fetchData = async () => {
     try {
       setIsLoading(true);
       setError(null);
 
-      const [horsesResponse, unassignedResponse] = await Promise.all([
-        fetch(`${API_BASE_URL}/horses`),
-        fetch(`${API_BASE_URL}/unassigned`),
-      ]);
+      const horsesRes = await fetch(`${API_BASE_URL}/horses`);
+      const unassignedRes = await fetch(`${API_BASE_URL}/unassigned`);
 
-      if (!horsesResponse.ok) throw new Error("Failed to fetch horses");
-      if (!unassignedResponse.ok)
-        throw new Error("Failed to fetch unassigned devices");
+      if (!horsesRes.ok) throw new Error("Failed to fetch horses");
+      if (!unassignedRes.ok) throw new Error("Failed unassigned devices");
 
-      const horsesData = await horsesResponse.json();
-      const unassignedData = await unassignedResponse.json();
+      const horsesData = await horsesRes.json();
+      const unassignedData = await unassignedRes.json();
 
-      // Adjust horse coordinates relative to user location if not already done by backend
-      const adjustedHorses =
-        userLocation && horsesData.horses
-          ? horsesData.horses.map((h) => ({
-              ...h,
-              coordinates: {
-                lat: h.coordinates.lat,
-                lng: h.coordinates.lng,
-              },
-            }))
-          : horsesData.horses;
+      // Fix numeric values
+      const cleaned = horsesData.horses.map(h => ({
+        ...h,
+        heartRate: safeNum(h.heartRate),
+        temperature: safeNum(h.temperature),
+        speed: safeNum(h.speed),
+        coordinates: {
+          lat: safeNum(h.coordinates.lat),
+          lng: safeNum(h.coordinates.lng)
+        }
+      }));
 
-      setHorses(adjustedHorses);
+      setHorses(cleaned);
       setUnassignedDevices(unassignedData.unassignedDevices);
       setLastUpdated(new Date().toLocaleTimeString());
-    } catch (error) {
-      console.error("Error fetching data:", error);
-      setError(error.message);
+    } catch (err) {
+      console.error(err);
+      setError(err.message);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Auto-fetch on mount + every 60s refresh
+  // ---- Fetch once location is known ----
   useEffect(() => {
     if (userLocation) fetchData();
+  }, [userLocation]);
+
+  // ---- Auto-refresh every 60 seconds ----
+  useEffect(() => {
     const interval = setInterval(() => {
       if (userLocation) fetchData();
     }, 60000);
     return () => clearInterval(interval);
   }, [userLocation]);
 
-  // Refresh after adding a horse
   const handleHorseAdded = async () => {
     await fetchData();
     setIsAddingHorse(false);
@@ -106,15 +100,13 @@ export const HorseMetrics = () => {
 
   return (
     <div className="space-y-6">
-      {/* Horse Details View */}
       {selectedHorse && (
         <DetailedHorseView
-          horse={horses.find((h) => h.horseId === selectedHorse)}
+          horse={horses.find(h => h.horseId === selectedHorse)}
           onClose={() => setSelectedHorse(null)}
         />
       )}
 
-      {/* Header Section */}
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-gray-800 dark:text-white">
           Horse Management
@@ -139,7 +131,6 @@ export const HorseMetrics = () => {
         </div>
       </div>
 
-      {/* Show error or last update info */}
       {error && (
         <div className="text-red-500 bg-red-100 border border-red-300 p-3 rounded-md">
           {error}
@@ -149,7 +140,6 @@ export const HorseMetrics = () => {
         <p className="text-sm text-gray-500">Last updated: {lastUpdated}</p>
       )}
 
-      {/* Loading / Grid Section */}
       {isLoading ? (
         <div className="flex justify-center items-center h-64">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
@@ -163,7 +153,7 @@ export const HorseMetrics = () => {
               unassignedDevices={unassignedDevices}
             />
           )}
-          {horses.map((horse) => (
+          {horses.map(horse => (
             <HorseCard
               key={horse.horseId}
               horse={horse}
