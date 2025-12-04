@@ -15,21 +15,33 @@ export const HorseMetrics = () => {
   const [userCoords, setUserCoords] = useState({ lat: 0, lng: 0 }); // current location
 
   // Get real geolocation from browser
-  useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setUserCoords({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude,
-          });
-        },
-        (err) => console.error("Geolocation error:", err)
-      );
-    } else {
-      console.warn("Geolocation is not supported by this browser.");
-    }
-  }, []);
+useEffect(() => {
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setUserCoords({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        });
+      },
+      (err) => {
+        console.warn("Geolocation error, using fallback coords:", err);
+        // Fallback: use fixed demo coordinates
+        setUserCoords({
+          lat: -1.2921,
+          lng: 36.8219,
+        });
+      }
+    );
+  } else {
+    console.warn("Geolocation is not supported, using fallback coords.");
+    setUserCoords({
+      lat: -1.2921,
+      lng: 36.8219,
+    });
+  }
+}, []);
+
 
   // Combined data fetch function
   const fetchData = async () => {
@@ -155,4 +167,3 @@ export const HorseMetrics = () => {
 };
 
 export default HorseMetrics;
-
