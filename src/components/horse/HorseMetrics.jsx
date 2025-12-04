@@ -113,38 +113,69 @@ const HorseMetrics = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ... rest of your component logic (UI rendering, event handlers, etc.)
-  // To keep focus on geolocation, the rest of the component is left intact.
-
   return (
-    <div>
-      {/* Example usage of geolocation data for debugging (remove in production) */}
-      {geoSupported ? (
-        geoLoading ? (
-          <p>Locating...</p>
-        ) : userLocation ? (
-          <p>
-            Your location: {userLocation.latitude.toFixed(6)}, {userLocation.longitude.toFixed(6)} (±{userLocation.accuracy}m)
-          </p>
+    <div className="p-6">
+      {/* Geolocation status for debugging */}
+      <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+        {geoSupported ? (
+          geoLoading ? (
+            <p className="text-blue-700 dark:text-blue-300">🔍 Locating your position...</p>
+          ) : userLocation ? (
+            <p className="text-green-700 dark:text-green-300">
+              ✅ Your location: {userLocation.latitude.toFixed(6)}, {userLocation.longitude.toFixed(6)} (±{Math.round(userLocation.accuracy)}m)
+            </p>
+          ) : (
+            <p className="text-yellow-700 dark:text-yellow-300">⚠️ Location not available.</p>
+          )
         ) : (
-          <p>Location not available.</p>
-        )
-      ) : (
-        <p>Geolocation not supported by this browser.</p>
+          <p className="text-red-700 dark:text-red-300">❌ Geolocation not supported by this browser.</p>
+        )}
+        {geoError && <p className="text-red-600 dark:text-red-400 mt-2">Error: {geoError.message}</p>}
+      </div>
+
+      {/* Map with user location */}
+      <div className="mb-6">
+        <h2 className="text-2xl font-bold mb-4 text-gray-800 dark:text-white">Live Location Map</h2>
+        <MapWithNoSSR 
+          horses={horses} 
+          selectedHorse={selectedHorse}
+          userLocation={userLocation}
+        />
+      </div>
+
+      {/* Loading and error states */}
+      {isLoading && <p className="text-gray-600 dark:text-gray-400">Loading horse data...</p>}
+      {error && <p className="text-red-600 dark:text-red-400">Error: {String(error)}</p>}
+
+      {/* Horse cards grid */}
+      {!isLoading && horses.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
+          {horses.map((horse) => (
+            <HorseCard 
+              key={horse.horseId} 
+              horse={horse} 
+              onViewDetails={() => setSelectedHorse(horse)}
+            />
+          ))}
+        </div>
       )}
 
-      {/* Rest of your UI would go here */}
-      {isLoading && <p>Loading data...</p>}
-      {error && <p>Error: {String(error)}</p>}
+      {/* Add horse form */}
+      {isAddingHorse && (
+        <AddHorseForm 
+          onClose={() => setIsAddingHorse(false)}
+          onSuccess={fetchData}
+          unassignedDevices={unassignedDevices}
+        />
+      )}
 
-      {/* Example rendering placeholder to avoid layout break if you paste directly */}
-      <div>
-        {/* Your existing components would go here, preserving their current logic/props */}
-        {/* <HorseCard ... />
-            <AddHorseForm ... />
-            <DetailedHorseView ... />
-            <MapWithNoSSR ... /> */}
-      </div>
+      {/* Detailed horse view */}
+      {selectedHorse && (
+        <DetailedHorseView 
+          horse={selectedHorse}
+          onClose={() => setSelectedHorse(null)}
+        />
+      )}
     </div>
   );
 };
