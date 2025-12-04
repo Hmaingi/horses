@@ -1,4 +1,4 @@
-import dynamic from "next/dynamic";
+iimport dynamic from "next/dynamic";
 import { useEffect } from "react";
 import "leaflet/dist/leaflet.css";
 
@@ -10,56 +10,52 @@ const Circle = dynamic(() => import("react-leaflet").then(m => m.Circle), { ssr:
 const useMap = dynamic(() => import("react-leaflet").then(m => m.useMap), { ssr: false });
 
 // Helper component to update map center when userLocation changes
-function MapUpdater({ center }) {
+function MapUpdater({ center, zoom }) {
   const map = useMap();
   
   useEffect(() => {
     if (center) {
-      map.setView(center, map.getZoom());
+      map.setView(center, zoom, { animate: true });
     }
-  }, [center, map]);
+  }, [center, zoom, map]);
   
   return null;
 }
 
 const MapWithNoSSR = ({ horses, selectedHorse, userLocation }) => {
-  if (typeof window !== "undefined") {
-    const L = require("leaflet");
-    
-    // Default horse marker
-    const DefaultIcon = L.icon({
-      iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
-      shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
-      iconSize: [25, 41],
-      iconAnchor: [12, 41],
-      popupAnchor: [1, -34],
-      shadowSize: [41, 41],
-    });
-    
-    // Blue marker for user location
-    const UserIcon = L.icon({
-      iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
-      shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
-      iconSize: [25, 41],
-      iconAnchor: [12, 41],
-      popupAnchor: [1, -34],
-      shadowSize: [41, 41],
-      className: 'user-location-marker'
-    });
-    
-    L.Marker.prototype.options.icon = DefaultIcon;
-  }
-
-  // Determine map center - prioritize user location for demo
-  const position = userLocation
-    ? [userLocation.latitude, userLocation.longitude]
-    : selectedHorse
-    ? [selectedHorse.coordinates.lat, selectedHorse.coordinates.lng]
-    : horses.length > 0
-    ? [horses[0].coordinates.lat, horses[0].coordinates.lng]
-    : [-1.286389, 36.817223]; // Default Nairobi
+  // Only recalculate position when dependencies actually change
+  const position = React.useMemo(() => {
+    if (userLocation) {
+      return [userLocation.latitude, userLocation.longitude];
+    }
+    if (selectedHorse) {
+      return [selectedHorse.coordinates.lat, selectedHorse.coordinates.lng];
+    }
+    if (horses.length > 0) {
+      return [horses[0].coordinates.lat, horses[0].coordinates.lng];
+    }
+    return [-1.286389, 36.817223]; // Default Nairobi
+  }, [userLocation, selectedHorse, horses]);
 
   const zoom = userLocation ? 15 : selectedHorse ? 15 : 12;
+
+  // Setup Leaflet icons once
+  React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      const L = require("leaflet");
+      
+      const DefaultIcon = L.icon({
+        iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
+        shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
+        iconSize: [25, 41],
+        iconAnchor: [12, 41],
+        popupAnchor: [1, -34],
+        shadowSize: [41, 41],
+      });
+      
+      L.Marker.prototype.options.icon = DefaultIcon;
+    }
+  }, []);
 
   return (
     <div style={{ position: 'relative' }}>
@@ -79,7 +75,7 @@ const MapWithNoSSR = ({ horses, selectedHorse, userLocation }) => {
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         
-        <MapUpdater center={userLocation ? [userLocation.latitude, userLocation.longitude] : null} />
+        <MapUpdater center={userLocation ? [userLocation.latitude, userLocation.longitude] : null} zoom={zoom} />
         
         {/* User location marker with accuracy circle */}
         {userLocation && (
@@ -112,7 +108,7 @@ const MapWithNoSSR = ({ horses, selectedHorse, userLocation }) => {
         {selectedHorse ? (
           <Marker position={[selectedHorse.coordinates.lat, selectedHorse.coordinates.lng]}>
             <Popup>
-              <strong> {selectedHorse.name}</strong>
+              <strong>🐴 {selectedHorse.name}</strong>
               <br />
               Location: {selectedHorse.location || "Unknown"}
               <br />
@@ -123,7 +119,7 @@ const MapWithNoSSR = ({ horses, selectedHorse, userLocation }) => {
           horses.map((h) => (
             <Marker key={h.horseId} position={[h.coordinates.lat, h.coordinates.lng]}>
               <Popup>
-                <strong> {h.name}</strong>
+                <strong>🐴 {h.name}</strong>
                 <br />
                 Location: {h.location || "Unknown"}
                 <br />
