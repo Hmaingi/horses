@@ -1,11 +1,11 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import dynamic from "next/dynamic";
 import HorseCard from "./HorseCard";
 import AddHorseForm from "./AddHorseForm";
 import DetailedHorseView from "./DetailedHorseView";
+import MapWithNoSSR from "./MapWithNoSSR";
 
-export const HorseMetrics = () => {
+const HorseMetrics = () => {
   const [horses, setHorses] = useState([]);
   const [unassignedDevices, setUnassignedDevices] = useState([]);
   const [selectedHorse, setSelectedHorse] = useState(null);
@@ -17,10 +17,7 @@ export const HorseMetrics = () => {
 
   const API_BASE_URL = "https://ebackend-production-fac4.up.railway.app/api";
 
-  // Dynamically import map for detailed view only
-  const MapWithNoSSR = dynamic(() => import("./MapWithNoSSR"), { ssr: false });
-
-  // Get browser geolocation
+  // --- Get browser geolocation ---
   useEffect(() => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -31,7 +28,8 @@ export const HorseMetrics = () => {
           });
         },
         () => {
-          setUserLocation({ lat: -1.286389, lng: 36.817223 }); // Nairobi fallback
+          // Fallback location (Nairobi)
+          setUserLocation({ lat: -1.286389, lng: 36.817223 });
         }
       );
     } else {
@@ -39,43 +37,37 @@ export const HorseMetrics = () => {
     }
   }, []);
 
-  // Fetch unassigned devices once
-  useEffect(() => {
-    const fetchUnassigned = async () => {
-      try {
-        const res = await fetch(`${API_BASE_URL}/unassigned`);
-        if (!res.ok) throw new Error("Failed to fetch unassigned devices");
-        const data = await res.json();
-        setUnassignedDevices(data.unassignedDevices);
-      } catch (err) {
-        console.error(err);
-      }
-    };
-    fetchUnassigned();
-  }, []);
-
-  // Fetch horses
-  const fetchHorses = async () => {
-    if (!userLocation) return;
-
+  // --- Fetch horses and unassigned devices ---
+  const fetchData = async () => {
     try {
       setIsLoading(true);
       setError(null);
 
-      const res = await fetch(`${API_BASE_URL}/horses`);
-      if (!res.ok) throw new Error("Failed to fetch horses");
+      const [horsesRes, unassignedRes] = await Promise.all([
+        fetch(`${API_BASE_URL}/horses`),
+        fetch(`${API_BASE_URL}/unassigned`),
+      ]);
 
-      const data = await res.json();
+      if (!horsesRes.ok) throw new Error("Failed to fetch horses");
+      if (!unassignedRes.ok) throw new Error("Failed to fetch unassigned devices");
 
-      const adjustedHorses = data.horses.map((h) => ({
+      const horsesData = await horsesRes.json();
+      const unassignedData = await unassignedRes.json();
+
+      // Adjust horse coordinates if missing
+      const adjustedHorses = horsesData.horses.map((h) => ({
         ...h,
-        coordinates: h.coordinates || { lat: userLocation.lat, lng: userLocation.lng },
-        speed: Number(h.speed),
-        temperature: Number(h.temperature),
-        heartRate: Number(h.heartRate),
+        coordinates: h.coordinates || {
+          lat: userLocation?.lat + (Math.random() - 0.5) * 0.01,
+          lng: userLocation?.lng + (Math.random() - 0.5) * 0.01,
+        },
+        speed: Number(h.speed) || Math.random() * 6,
+        temperature: Number(h.temperature) || 37 + Math.random() * 2,
+        heartRate: Number(h.heartRate) || 60 + Math.floor(Math.random() * 25),
       }));
 
       setHorses(adjustedHorses);
+      setUnassignedDevices(unassignedData.unassignedDevices);
       setLastUpdated(new Date().toLocaleTimeString());
     } catch (err) {
       console.error(err);
@@ -85,32 +77,34 @@ export const HorseMetrics = () => {
     }
   };
 
-  // Initial fetch & interval
+  // --- Initial fetch and polling every 60s ---
   useEffect(() => {
-    if (userLocation) {
-      fetchHorses();
-      const interval = setInterval(fetchHorses, 60000);
-      return () => clearInterval(interval);
-    }
+    if (userLocation) fetchData();
+    const interval = setInterval(() => {
+      if (userLocation) fetchData();
+    }, 60000);
+    return () => clearInterval(interval);
   }, [userLocation]);
 
   const handleHorseAdded = async () => {
-    await fetchHorses();
+    await fetchData();
     setIsAddingHorse(false);
   };
 
-  const selectedHorseObj = horses.find((h) => h.horseId === selectedHorse);
-
   return (
     <div className="space-y-6">
-      {/* Horse Details View */}
-      {selectedHorseObj && (
+      {/* Horse Details + Map */}
+      {selectedHorse && (
         <DetailedHorseView
-          horse={selectedHorseObj}
+          horse={horses.find((h) => h.horseId === selectedHorse)}
           onClose={() => setSelectedHorse(null)}
         >
-          {/* Load map inside detailed view */}
-          <MapWithNoSSR horses={[selectedHorseObj]} selectedHorse={selectedHorseObj} />
+          {/* Map appears inside DetailedHorseView */}
+          <MapWithNoSSR
+            horses={horses}
+            selectedHorse={horses.find((h) => h.horseId === selectedHorse)}
+            userLocation={userLocation}
+          />
         </DetailedHorseView>
       )}
 
@@ -121,19 +115,17 @@ export const HorseMetrics = () => {
         </h2>
         <div className="flex gap-3">
           <button
-            onClick={fetchHorses}
+            onClick={fetchData}
             className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
           >
-            <span>↻</span>
-            <span>Refresh</span>
+            ↻ Refresh
           </button>
           {!isAddingHorse && (
             <button
               onClick={() => setIsAddingHorse(true)}
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
             >
-              <span className="font-bold text-lg">+</span>
-              <span>Add Horse</span>
+              <span className="font-bold text-lg">+</span> Add Horse
             </button>
           )}
         </div>
@@ -149,7 +141,7 @@ export const HorseMetrics = () => {
         <p className="text-sm text-gray-500">Last updated: {lastUpdated}</p>
       )}
 
-      {/* Horse cards */}
+      {/* Horse Cards */}
       {isLoading ? (
         <div className="flex justify-center items-center h-64">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
@@ -177,5 +169,4 @@ export const HorseMetrics = () => {
 };
 
 export default HorseMetrics;
-
 
