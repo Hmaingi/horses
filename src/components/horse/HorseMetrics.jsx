@@ -10,22 +10,26 @@ export const HorseMetrics = () => {
   const [selectedHorse, setSelectedHorse] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAddingHorse, setIsAddingHorse] = useState(false);
-  const [error, setError] = useState(null); // new error state
-  const [lastUpdated, setLastUpdated] = useState(null); //for showing last refresh time
+  const [error, setError] = useState(null);
+  const [lastUpdated, setLastUpdated] = useState(null);
 
-  //Combined data fetch function
+  //  Railway backend URL
+  const API_BASE_URL = "https://ebackend-production-fac4.up.railway.app/api";
+
+  // Combined data fetch function
   const fetchData = async () => {
     try {
       setIsLoading(true);
       setError(null);
 
       const [horsesResponse, unassignedResponse] = await Promise.all([
-        fetch("https://horsetrackerbackend.onrender.com/api/horses"),
-        fetch("https://horsetrackerbackend.onrender.com/api/unassigned"),
+        fetch(`${API_BASE_URL}/horses`),
+        fetch(`${API_BASE_URL}/unassigned`),
       ]);
 
       if (!horsesResponse.ok) throw new Error("Failed to fetch horses");
-      if (!unassignedResponse.ok) throw new Error("Failed to fetch unassigned devices");
+      if (!unassignedResponse.ok)
+        throw new Error("Failed to fetch unassigned devices");
 
       const horsesData = await horsesResponse.json();
       const unassignedData = await unassignedResponse.json();
@@ -89,16 +93,14 @@ export const HorseMetrics = () => {
         </div>
       </div>
 
-      {/* 🆕 Show error or last update info */}
+      {/* Show error or last update info */}
       {error && (
         <div className="text-red-500 bg-red-100 border border-red-300 p-3 rounded-md">
-          ⚠️ {error}
+          {error}
         </div>
       )}
       {lastUpdated && !error && (
-        <p className="text-sm text-gray-500">
-          Last updated: {lastUpdated}
-        </p>
+        <p className="text-sm text-gray-500">Last updated: {lastUpdated}</p>
       )}
 
       {/* Loading / Grid Section */}
@@ -129,3 +131,4 @@ export const HorseMetrics = () => {
 };
 
 export default HorseMetrics;
+
