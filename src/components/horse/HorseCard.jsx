@@ -4,6 +4,12 @@ import MetricCard from "./MetricCard";
 import { HeartIcon, LocationIcon, SpeedIcon, TemperatureIcon } from "@/icons";
 
 const HorseCard = ({ horse, onViewDetails }) => {
+  // Format coordinates if available
+  const locationText =
+    horse.coordinates?.lat && horse.coordinates?.lng
+      ? `${horse.coordinates.lat.toFixed(5)}, ${horse.coordinates.lng.toFixed(5)}`
+      : horse.location || "Unknown";
+
   return (
     <div
       className="group rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-white/[0.03] p-6 shadow-sm hover:shadow-lg transition-shadow duration-200 cursor-pointer"
@@ -14,7 +20,13 @@ const HorseCard = ({ horse, onViewDetails }) => {
           <h3 className="text-xl font-semibold text-gray-800 dark:text-white">{horse.name}</h3>
         </div>
         <Badge
-          color={horse.status === "normal" ? "success" : horse.status === "attention" ? "warning" : "error"}
+          color={
+            horse.status === "normal"
+              ? "success"
+              : horse.status === "attention"
+              ? "warning"
+              : "error"
+          }
         >
           {horse.status}
         </Badge>
@@ -33,12 +45,12 @@ const HorseCard = ({ horse, onViewDetails }) => {
         <MetricCard
           icon={<LocationIcon className="size-5 text-green-500" />}
           label="Location"
-          value={horse.location || "Unknown"}
+          value={locationText}
         />
         <MetricCard
           icon={<SpeedIcon className="size-5 text-blue-500" />}
           label="Speed"
-          value={`${horse.speed} km/h`}
+          value={`${horse.speed.toFixed(1)} km/h`}
         />
       </div>
       <div className="mt-5 flex items-center justify-between text-sm">
@@ -58,3 +70,4 @@ const HorseCard = ({ horse, onViewDetails }) => {
 };
 
 export default HorseCard;
+
