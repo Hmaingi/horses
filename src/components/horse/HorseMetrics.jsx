@@ -7,7 +7,7 @@ import MapWithNoSSR from "./MapWithNoSSR";
 
 // Geolocation hook (continuous tracking with watchPosition)
 function useGeolocationContinuous() {
-  const [coords, setCoords] = useState(null); // { latitude, longitude, accuracy }
+  const [coords, setCoords] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [supported, setSupported] = useState(true);
@@ -22,7 +22,6 @@ function useGeolocationContinuous() {
 
     setLoading(true);
 
-    // Use watchPosition for continuous updates
     const id = navigator.geolocation.watchPosition(
       (position) => {
         const { latitude, longitude, accuracy } = position.coords;
@@ -31,7 +30,6 @@ function useGeolocationContinuous() {
         setLoading(false);
       },
       (err) => {
-        // Surface error (do not silently fallback)
         let message = "Geolocation error.";
         switch (err.code) {
           case err.PERMISSION_DENIED:
@@ -52,21 +50,17 @@ function useGeolocationContinuous() {
       },
       {
         enableHighAccuracy: true,
-        maximumAge: 5000,  // allow up to 5 seconds old data (faster lock)
-        timeout: 30000      // longer timeout for initial lock
+        maximumAge: 5000,
+        timeout: 30000
       }
     );
 
-    // Cleanup on unmount
     return () => {
       navigator.geolocation.clearWatch(id);
     };
-  }, []); // run once on mount
-
-  // Optional manual refresh (not strictly needed with watch)
-  const refresh = useCallback(() => {
-    // Could implement a one-shot fetch here if desired.
   }, []);
+
+  const refresh = useCallback(() => {}, []);
 
   return { coords, loading, error, supported, refresh };
 }
@@ -79,43 +73,84 @@ const HorseMetrics = () => {
   const [isAddingHorse, setIsAddingHorse] = useState(false);
   const [error, setError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
+  const [fetchTime, setFetchTime] = useState(null);
 
-  // Live user location (continuous)
   const { coords: userLocation, loading: geoLoading, error: geoError, supported: geoSupported } = useGeolocationContinuous();
 
   const API_BASE_URL = "https://ebackend-production-fac4.up.railway.app/api";
 
-  // --- Fetch horses and unassigned devices ---
-  const fetchData = async () => {
+  // Fetch with timeout
+  const fetchWithTimeout = async (url, timeout = 10000) => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+    
+    try {
+      const response = await fetch(url, { signal: controller.signal });
+      clearTimeout(timeoutId);
+      return response;
+    } catch (err) {
+      clearTimeout(timeoutId);
+      if (err.name === 'AbortError') {
+        throw new Error(`Request timeout after ${timeout/1000}s`);
+      }
+      throw err;
+    }
+  };
+
+  const fetchData = useCallback(async () => {
+    const startTime = Date.now();
     try {
       setIsLoading(true);
       setError(null);
 
-      const [horsesRes, unassignedRes] = await Promise.all(
-        [
-          fetch(`${API_BASE_URL}/horses`).then((r) => r.json()),
-          fetch(`${API_BASE_URL}/unassigned-devices`).then((r) => r.json()),
-        ]
-      );
+      console.log("Starting API fetch...");
+      
+      const [horsesRes, unassignedRes] = await Promise.all([
+        fetchWithTimeout(`${API_BASE_URL}/horses`, 15000)
+          .then((r) => {
+            console.log("Horses response received");
+            return r.json();
+          })
+          .catch((err) => {
+            console.error("Horses fetch error:", err);
+            return [];
+          }),
+        fetchWithTimeout(`${API_BASE_URL}/unassigned-devices`, 15000)
+          .then((r) => {
+            console.log("Unassigned devices response received");
+            return r.json();
+          })
+          .catch((err) => {
+            console.error("Unassigned devices fetch error:", err);
+            return [];
+          }),
+      ]);
 
+      const endTime = Date.now();
+      const duration = ((endTime - startTime) / 1000).toFixed(2);
+      
       setHorses(horsesRes || []);
       setUnassignedDevices(unassignedRes || []);
       setLastUpdated(new Date().toISOString());
+      setFetchTime(duration);
       setIsLoading(false);
+      
+      console.log(`Data fetched in ${duration}s`);
     } catch (e) {
+      console.error("Fetch error:", e);
       setError(e);
       setIsLoading(false);
     }
-  };
+  }, [API_BASE_URL]);
 
   useEffect(() => {
     fetchData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Only run once on mount
   }, []);
 
   return (
     <div className="p-6">
-      {/* Geolocation status for debugging */}
+      {/* Geolocation status */}
       <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
         {geoSupported ? (
           geoLoading ? (
@@ -133,6 +168,31 @@ const HorseMetrics = () => {
         {geoError && <p className="text-red-600 dark:text-red-400 mt-2">Error: {geoError.message}</p>}
       </div>
 
+      {/* API Status */}
+      {isLoading && (
+        <div className="mb-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
+          <p className="text-yellow-700 dark:text-yellow-300">
+            ⏳ Loading horse data from API... This may take a moment.
+          </p>
+          <p className="text-sm text-yellow-600 dark:text-yellow-400 mt-1">
+            If this takes too long, the API server might be slow or sleeping (common with free hosting)
+          </p>
+        </div>
+      )}
+
+      {fetchTime && (
+        <div className="mb-4 p-2 bg-gray-100 dark:bg-gray-800 rounded text-sm text-gray-600 dark:text-gray-400">
+          Last fetch: {fetchTime}s | Last updated: {new Date(lastUpdated).toLocaleTimeString()}
+          <button 
+            onClick={fetchData} 
+            className="ml-4 text-blue-600 dark:text-blue-400 hover:underline"
+            disabled={isLoading}
+          >
+            🔄 Refresh
+          </button>
+        </div>
+      )}
+
       {/* Map with user location */}
       <div className="mb-6">
         <h2 className="text-2xl font-bold mb-4 text-gray-800 dark:text-white">Live Location Map</h2>
@@ -143,20 +203,46 @@ const HorseMetrics = () => {
         />
       </div>
 
-      {/* Loading and error states */}
-      {isLoading && <p className="text-gray-600 dark:text-gray-400">Loading horse data...</p>}
-      {error && <p className="text-red-600 dark:text-red-400">Error: {String(error)}</p>}
+      {/* Error state */}
+      {error && (
+        <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg">
+          <p className="text-red-600 dark:text-red-400">❌ Error: {String(error.message || error)}</p>
+          <button 
+            onClick={fetchData} 
+            className="mt-2 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+          >
+            Try Again
+          </button>
+        </div>
+      )}
 
       {/* Horse cards grid */}
       {!isLoading && horses.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
-          {horses.map((horse) => (
-            <HorseCard 
-              key={horse.horseId} 
-              horse={horse} 
-              onViewDetails={() => setSelectedHorse(horse)}
-            />
-          ))}
+        <div>
+          <h2 className="text-2xl font-bold mb-4 text-gray-800 dark:text-white">
+            Horses ({horses.length})
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {horses.map((horse) => (
+              <HorseCard 
+                key={horse.horseId} 
+                horse={horse} 
+                onViewDetails={() => setSelectedHorse(horse)}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {!isLoading && horses.length === 0 && !error && (
+        <div className="p-8 text-center text-gray-500 dark:text-gray-400">
+          <p className="text-lg">No horses found</p>
+          <button 
+            onClick={() => setIsAddingHorse(true)}
+            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          >
+            Add First Horse
+          </button>
         </div>
       )}
 
