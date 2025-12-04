@@ -10,75 +10,73 @@ export const HorseMetrics = () => {
   const [selectedHorse, setSelectedHorse] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAddingHorse, setIsAddingHorse] = useState(false);
-  const [error, setError] = useState(null);
-  const [lastUpdated, setLastUpdated] = useState(null);
-  const [userLocation, setUserLocation] = useState({ lat: -1.286389, lng: 36.817223 }); // default Nairobi
+  const [error, setError] = useState(null); // new error state
+  const [lastUpdated, setLastUpdated] = useState(null); //for showing last refresh time
+  const [userCoords, setUserCoords] = useState({ lat: 0, lng: 0 }); // current location
 
-  const API_BASE_URL = "https://ebackend-production-fac4.up.railway.app/api";
-
-  // --- Get browser geolocation ---
+  // Get real geolocation from browser
   useEffect(() => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          setUserLocation({
+          setUserCoords({
             lat: position.coords.latitude,
             lng: position.coords.longitude,
           });
         },
-        () => {
-          // fallback already set in state
-          console.warn("Geolocation denied, using default location.");
-        }
+        (err) => console.error("Geolocation error:", err)
       );
+    } else {
+      console.warn("Geolocation is not supported by this browser.");
     }
   }, []);
 
-  // --- Fetch horses and unassigned devices ---
+  // Combined data fetch function
   const fetchData = async () => {
     try {
       setIsLoading(true);
       setError(null);
 
-      const [horsesRes, unassignedRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/horses`),
-        fetch(`${API_BASE_URL}/unassigned`),
+      const [horsesResponse, unassignedResponse] = await Promise.all([
+        fetch("http://localhost:3000/api/horses"),
+        fetch("http://localhost:3000/api/unassigned"),
       ]);
 
-      if (!horsesRes.ok) throw new Error("Failed to fetch horses");
-      if (!unassignedRes.ok) throw new Error("Failed to fetch unassigned devices");
+      if (!horsesResponse.ok) throw new Error("Failed to fetch horses");
+      if (!unassignedResponse.ok)
+        throw new Error("Failed to fetch unassigned devices");
 
-      const horsesData = await horsesRes.json();
-      const unassignedData = await unassignedRes.json();
+      const horsesData = await horsesResponse.json();
+      const unassignedData = await unassignedResponse.json();
 
-      // Ensure each horse has coordinates
-      const adjustedHorses = horsesData.horses.map((h) => ({
-        ...h,
-        coordinates: h.coordinates || {
-          lat: userLocation.lat + (Math.random() - 0.5) * 0.01,
-          lng: userLocation.lng + (Math.random() - 0.5) * 0.01,
-        },
-        speed: Number(h.speed) || Math.random() * 6,
-        temperature: Number(h.temperature) || 37 + Math.random() * 2,
-        heartRate: Number(h.heartRate) || 60 + Math.floor(Math.random() * 25),
+      // Inject current location for live demo
+      const updatedHorses = horsesData.horses.map((horse) => ({
+        ...horse,
+        coordinates: { ...userCoords },
+        location: "Current Location", // optional label
       }));
 
-      setHorses(adjustedHorses);
+      setHorses(updatedHorses);
       setUnassignedDevices(unassignedData.unassignedDevices);
       setLastUpdated(new Date().toLocaleTimeString());
-    } catch (err) {
-      console.error(err);
-      setError(err.message);
+    } catch (error) {
+      console.error("Error fetching data:", error);
+      setError(error.message);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // --- Fetch once on mount ---
+  // Auto-fetch on mount + every 50s refresh
   useEffect(() => {
-    fetchData();
-  }, [userLocation]);
+    if (userCoords.lat && userCoords.lng) {
+      fetchData(); // fetch only after coordinates are available
+      const interval = setInterval(fetchData, 50000);
+      return () => clearInterval(interval);
+    }
+  }, [userCoords]);
 
+  // Refresh after adding a horse
   const handleHorseAdded = async () => {
     await fetchData();
     setIsAddingHorse(false);
@@ -90,19 +88,18 @@ export const HorseMetrics = () => {
       {selectedHorse && (
         <DetailedHorseView
           horse={horses.find((h) => h.horseId === selectedHorse)}
-          userLocation={userLocation}
           onClose={() => setSelectedHorse(null)}
         />
       )}
 
-      {/* Header */}
+      {/* Header Section */}
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-gray-800 dark:text-white">
           Horse Management
         </h2>
         <div className="flex gap-3">
           <button
-            onClick={fetchData}
+            onClick={fetchData} // manual refresh button
             className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
           >
             <span>↻</span>
@@ -120,17 +117,17 @@ export const HorseMetrics = () => {
         </div>
       </div>
 
-      {/* Error / Last updated */}
+      {/* Error / Last Update */}
       {error && (
         <div className="text-red-500 bg-red-100 border border-red-300 p-3 rounded-md">
-          {error}
+          ⚠️ {error}
         </div>
       )}
       {lastUpdated && !error && (
         <p className="text-sm text-gray-500">Last updated: {lastUpdated}</p>
       )}
 
-      {/* Horse cards */}
+      {/* Loading / Grid Section */}
       {isLoading ? (
         <div className="flex justify-center items-center h-64">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
@@ -158,3 +155,4 @@ export const HorseMetrics = () => {
 };
 
 export default HorseMetrics;
+
