@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useEffect } from "react";
+import dynamic from "next/dynamic";
 import HorseCard from "./HorseCard";
 import AddHorseForm from "./AddHorseForm";
 import DetailedHorseView from "./DetailedHorseView";
@@ -15,6 +16,9 @@ export const HorseMetrics = () => {
   const [userLocation, setUserLocation] = useState(null);
 
   const API_BASE_URL = "https://ebackend-production-fac4.up.railway.app/api";
+
+  // Dynamically import map for detailed view only
+  const MapWithNoSSR = dynamic(() => import("./MapWithNoSSR"), { ssr: false });
 
   // Get browser geolocation
   useEffect(() => {
@@ -35,39 +39,43 @@ export const HorseMetrics = () => {
     }
   }, []);
 
-  // Fetch data
-  const fetchData = async () => {
+  // Fetch unassigned devices once
+  useEffect(() => {
+    const fetchUnassigned = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/unassigned`);
+        if (!res.ok) throw new Error("Failed to fetch unassigned devices");
+        const data = await res.json();
+        setUnassignedDevices(data.unassignedDevices);
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    fetchUnassigned();
+  }, []);
+
+  // Fetch horses
+  const fetchHorses = async () => {
+    if (!userLocation) return;
+
     try {
       setIsLoading(true);
       setError(null);
 
-      const [horsesRes, unassignedRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/horses`),
-        fetch(`${API_BASE_URL}/unassigned`),
-      ]);
+      const res = await fetch(`${API_BASE_URL}/horses`);
+      if (!res.ok) throw new Error("Failed to fetch horses");
 
-      if (!horsesRes.ok) throw new Error("Failed to fetch horses");
-      if (!unassignedRes.ok) throw new Error("Failed to fetch unassigned devices");
+      const data = await res.json();
 
-      const horsesData = await horsesRes.json();
-      const unassignedData = await unassignedRes.json();
-
-      const adjustedHorses =
-        userLocation && horsesData.horses
-          ? horsesData.horses.map((h) => ({
-              ...h,
-              coordinates: h.coordinates || {
-                lat: userLocation.lat + (Math.random() - 0.5) * 0.01,
-                lng: userLocation.lng + (Math.random() - 0.5) * 0.01,
-              },
-              speed: Number(h.speed) || Math.random() * 6,
-              temperature: Number(h.temperature) || 37 + Math.random() * 2,
-              heartRate: Number(h.heartRate) || 60 + Math.floor(Math.random() * 25),
-            }))
-          : horsesData.horses;
+      const adjustedHorses = data.horses.map((h) => ({
+        ...h,
+        coordinates: h.coordinates || { lat: userLocation.lat, lng: userLocation.lng },
+        speed: Number(h.speed),
+        temperature: Number(h.temperature),
+        heartRate: Number(h.heartRate),
+      }));
 
       setHorses(adjustedHorses);
-      setUnassignedDevices(unassignedData.unassignedDevices);
       setLastUpdated(new Date().toLocaleTimeString());
     } catch (err) {
       console.error(err);
@@ -77,27 +85,33 @@ export const HorseMetrics = () => {
     }
   };
 
+  // Initial fetch & interval
   useEffect(() => {
-    if (userLocation) fetchData();
-    const interval = setInterval(() => {
-      if (userLocation) fetchData();
-    }, 60000);
-    return () => clearInterval(interval);
+    if (userLocation) {
+      fetchHorses();
+      const interval = setInterval(fetchHorses, 60000);
+      return () => clearInterval(interval);
+    }
   }, [userLocation]);
 
   const handleHorseAdded = async () => {
-    await fetchData();
+    await fetchHorses();
     setIsAddingHorse(false);
   };
+
+  const selectedHorseObj = horses.find((h) => h.horseId === selectedHorse);
 
   return (
     <div className="space-y-6">
       {/* Horse Details View */}
-      {selectedHorse && (
+      {selectedHorseObj && (
         <DetailedHorseView
-          horse={horses.find((h) => h.horseId === selectedHorse)}
+          horse={selectedHorseObj}
           onClose={() => setSelectedHorse(null)}
-        />
+        >
+          {/* Load map inside detailed view */}
+          <MapWithNoSSR horses={[selectedHorseObj]} selectedHorse={selectedHorseObj} />
+        </DetailedHorseView>
       )}
 
       {/* Header */}
@@ -107,7 +121,7 @@ export const HorseMetrics = () => {
         </h2>
         <div className="flex gap-3">
           <button
-            onClick={fetchData}
+            onClick={fetchHorses}
             className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
           >
             <span>↻</span>
@@ -163,4 +177,5 @@ export const HorseMetrics = () => {
 };
 
 export default HorseMetrics;
+
 
