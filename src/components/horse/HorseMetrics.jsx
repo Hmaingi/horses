@@ -12,9 +12,32 @@ export const HorseMetrics = () => {
   const [isAddingHorse, setIsAddingHorse] = useState(false);
   const [error, setError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
+  const [userLocation, setUserLocation] = useState(null);
 
-  //  Railway backend URL
+  // Railway backend URL
   const API_BASE_URL = "https://ebackend-production-fac4.up.railway.app/api";
+
+  // Get browser location
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setUserLocation({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+          });
+        },
+        (error) => {
+          console.error("Geolocation error:", error);
+          // fallback to a default location
+          setUserLocation({ lat: -0.4235, lng: 36.9485 });
+        }
+      );
+    } else {
+      console.error("Geolocation not supported");
+      setUserLocation({ lat: -0.4235, lng: 36.9485 });
+    }
+  }, []);
 
   // Combined data fetch function
   const fetchData = async () => {
@@ -34,7 +57,19 @@ export const HorseMetrics = () => {
       const horsesData = await horsesResponse.json();
       const unassignedData = await unassignedResponse.json();
 
-      setHorses(horsesData.horses);
+      // Adjust horse coordinates relative to user location
+      const adjustedHorses =
+        userLocation && horsesData.horses
+          ? horsesData.horses.map((h) => ({
+              ...h,
+              coordinates: {
+                lat: userLocation.lat + (h.coordinates.lat - -0.4235),
+                lng: userLocation.lng + (h.coordinates.lng - 36.9485),
+              },
+            }))
+          : horsesData.horses;
+
+      setHorses(adjustedHorses);
       setUnassignedDevices(unassignedData.unassignedDevices);
       setLastUpdated(new Date().toLocaleTimeString());
     } catch (error) {
@@ -47,10 +82,12 @@ export const HorseMetrics = () => {
 
   // Auto-fetch on mount + every 60s refresh
   useEffect(() => {
-    fetchData();
-    const interval = setInterval(fetchData, 60000);
+    if (userLocation) fetchData();
+    const interval = setInterval(() => {
+      if (userLocation) fetchData();
+    }, 60000);
     return () => clearInterval(interval);
-  }, []);
+  }, [userLocation]);
 
   // Refresh after adding a horse
   const handleHorseAdded = async () => {
