@@ -23,10 +23,15 @@ const MapWithNoSSR = ({ horses, selectedHorse }) => {
     L.Marker.prototype.options.icon = DefaultIcon;
   }
 
-  const position = selectedHorse
-    ? [selectedHorse.coordinates.lat, selectedHorse.coordinates.lng]
-    : [40.7178, -74.001]; // Default to New York if no horse selected
-  const zoom = selectedHorse ? 15 : 12;
+  const defaultPosition =
+  horses && horses.length > 0
+    ? [horses[0].coordinates.lat, horses[0].coordinates.lng] // first horse
+    : [-1.286389, 36.817223]; // fallback: Nairobi CBD
+
+const position = selectedHorse
+  ? [selectedHorse.coordinates.lat, selectedHorse.coordinates.lng]
+  : defaultPosition;
+
 
   return (
     <MapContainer
