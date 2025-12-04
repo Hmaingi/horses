@@ -3,7 +3,6 @@ import React, { useState, useEffect } from "react";
 import HorseCard from "./HorseCard";
 import AddHorseForm from "./AddHorseForm";
 import DetailedHorseView from "./DetailedHorseView";
-import MapWithNoSSR from "./MapWithNoSSR";
 
 export const HorseMetrics = () => {
   const [horses, setHorses] = useState([]);
@@ -53,10 +52,9 @@ export const HorseMetrics = () => {
       const horsesData = await horsesRes.json();
       const unassignedData = await unassignedRes.json();
 
-      // If backend returns coordinates, use them; otherwise, fake them around user
       const adjustedHorses =
         userLocation && horsesData.horses
-          ? horsesData.horses.map((h, i) => ({
+          ? horsesData.horses.map((h) => ({
               ...h,
               coordinates: h.coordinates || {
                 lat: userLocation.lat + (Math.random() - 0.5) * 0.01,
@@ -94,9 +92,6 @@ export const HorseMetrics = () => {
 
   return (
     <div className="space-y-6">
-      {/* Map */}
-      {userLocation && <MapWithNoSSR horses={horses} selectedHorse={horses.find(h => h.horseId === selectedHorse)} />}
-
       {/* Horse Details View */}
       {selectedHorse && (
         <DetailedHorseView
@@ -131,8 +126,14 @@ export const HorseMetrics = () => {
       </div>
 
       {/* Error / Last updated */}
-      {error && <div className="text-red-500 bg-red-100 border border-red-300 p-3 rounded-md">{error}</div>}
-      {lastUpdated && !error && <p className="text-sm text-gray-500">Last updated: {lastUpdated}</p>}
+      {error && (
+        <div className="text-red-500 bg-red-100 border border-red-300 p-3 rounded-md">
+          {error}
+        </div>
+      )}
+      {lastUpdated && !error && (
+        <p className="text-sm text-gray-500">Last updated: {lastUpdated}</p>
+      )}
 
       {/* Horse cards */}
       {isLoading ? (
@@ -162,3 +163,4 @@ export const HorseMetrics = () => {
 };
 
 export default HorseMetrics;
+
