@@ -17,20 +17,29 @@ export const HorseMetrics = () => {
   // Railway backend URL
   const API_BASE_URL = "https://ebackend-production-fac4.up.railway.app/api";
 
-  // Get browser location
+  // Get browser location and send to backend
   useEffect(() => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          setUserLocation({
+          const loc = {
             lat: position.coords.latitude,
             lng: position.coords.longitude,
-          });
+          };
+          setUserLocation(loc);
+
+          // Send location to backend so horses are centered around it
+          fetch(`${API_BASE_URL}/location`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(loc),
+          }).catch((err) =>
+            console.error("Failed to send location to backend:", err)
+          );
         },
         (error) => {
           console.error("Geolocation error:", error);
-          // fallback to a default location
-          setUserLocation({ lat: -0.4235, lng: 36.9485 });
+          setUserLocation({ lat: -0.4235, lng: 36.9485 }); // fallback
         }
       );
     } else {
@@ -57,14 +66,14 @@ export const HorseMetrics = () => {
       const horsesData = await horsesResponse.json();
       const unassignedData = await unassignedResponse.json();
 
-      // Adjust horse coordinates relative to user location
+      // Adjust horse coordinates relative to user location if not already done by backend
       const adjustedHorses =
         userLocation && horsesData.horses
           ? horsesData.horses.map((h) => ({
               ...h,
               coordinates: {
-                lat: userLocation.lat + (h.coordinates.lat - -0.4235),
-                lng: userLocation.lng + (h.coordinates.lng - 36.9485),
+                lat: h.coordinates.lat,
+                lng: h.coordinates.lng,
               },
             }))
           : horsesData.horses;
@@ -112,7 +121,7 @@ export const HorseMetrics = () => {
         </h2>
         <div className="flex gap-3">
           <button
-            onClick={fetchData} // manual refresh button
+            onClick={fetchData}
             className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
           >
             <span>↻</span>
@@ -168,4 +177,5 @@ export const HorseMetrics = () => {
 };
 
 export default HorseMetrics;
+
 
